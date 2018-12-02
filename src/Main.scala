@@ -1,5 +1,4 @@
-
-import scala.collection.immutable.{HashMap, HashSet}
+import scala.collection.immutable.HashSet
 import scala.io.Source
 
 object Days {
@@ -19,46 +18,32 @@ object Days {
   }
 
   def day2(inputStrings: Iterator[String]): Unit = {
-    type TwoAndThreeList = (Seq[String], Seq[String])
+    val input = inputStrings.toList
 
-    val emptyLists: TwoAndThreeList = (Seq[String](), Seq[String]())
-    def collectTwoAndThreeLetterWords(lists: TwoAndThreeList, currentString: String): TwoAndThreeList = {
+    def seperateByCharacter(string: String): Set[String] = string.groupBy(identity).values.toSet
+    val grouped: Seq[Set[Int]] = input.map(seperateByCharacter(_).map(_.length))
 
-      val emptyMap = HashMap[Char, Int]().withDefaultValue(0)
-      def updateCountEntry(map: Map[Char, Int], char: Char) = map + (char -> (map(char) + 1))
-      val resultMap = currentString.foldLeft(emptyMap)(updateCountEntry)
+    def filterWithLetterFrequency(freq: Int) = (input zip grouped).filter(_._2(freq)).map(_._1) // optimization: zip input with grouped outside of the function
 
-      (if(resultMap.values.exists(_ == 2)) lists._1 ++ Seq(currentString) else lists._1,
-        if(resultMap.values.exists(_ == 3)) lists._2 ++ Seq(currentString) else lists._2)
-    }
-    val (twos, threes) = inputStrings.foldLeft(emptyLists)(collectTwoAndThreeLetterWords)
-
-    val checksum = twos.length * threes.length
+    val candidates = for(freq <- 2 to 3) yield filterWithLetterFrequency(freq)
+    val checksum = candidates.foldLeft(1)(_ * _.length)
     println(s"Tast1: $checksum")
 
-    val searchspace = twos.combinations(2) ++ threes.combinations(2)
-    for(combination <- searchspace) {
-      val zipped = combination(0).zip(combination(1)).zipWithIndex
+    def equals(pair: (Char, Char)) = pair._1 == pair._2
+    def countDifferences(left: String, right: String) = (left zip right).filterNot(equals).length
+    def commonChars(left: String, right: String) = (left zip right).filter(equals).map(_._1).mkString("") // optimization: remember the index of the difference
 
-      type Index = Int
-      def collectIndicesOfDifferences(acc: Set[Index], chars: ((Char, Char), Index)) = if(chars._1._1 != chars._1._2) acc + chars._2 else acc
-      val indicesOfDifferences = zipped.foldLeft(Set[Index]())(collectIndicesOfDifferences)
-
-      if(indicesOfDifferences.size == 1) {
-        val allChars = combination.head
-        val index = indicesOfDifferences.head
-        val sameChars = allChars.take(index) + allChars.takeRight(allChars.length - index - 1)
-        println(s"Task2: $sameChars")
-        return
+    def findMatch(current: String, rest: Seq[String], diffs: Int): String =
+      rest.find(countDifferences(_, current) == diffs) match {
+        case Some(res) => commonChars(res, current)
+        case _ => findMatch(rest.head, rest.tail, diffs)
       }
-    }
+    val matches = candidates.map(list => findMatch(list.head, list.tail, diffs = 1))
+    println(s"Task2: ${matches.head}")
   }
-
 }
-
 
 object Main extends App {
   //Days.day1(Source.fromFile("input1.txt").getLines())
-  //Days.day2(Source.fromFile("input2.txt").getLines())
-
+  Days.day2(Source.fromFile("input2.txt").getLines())
 }
